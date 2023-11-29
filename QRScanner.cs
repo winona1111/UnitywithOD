@@ -27,6 +27,8 @@ public class QRScanner : MonoBehaviour
     private string level = "";
     private string colorrr = "";
     private string colorName = "detecting...";
+    private bool expFin = false; //看實驗有沒有完成
+    private string expFText = "Experiment Finished!";
     private double factor = 1;
     private Color32 lastProcessedColor;
     public Texture2D texture;
@@ -217,6 +219,7 @@ public class QRScanner : MonoBehaviour
 
 
             yield return StartCoroutine(ImgConnectCoroutine());
+            yield return StartCoroutine(BbxConnectCoroutine());
 
 
             if (imgConnected && imgClient != null)
@@ -227,14 +230,11 @@ public class QRScanner : MonoBehaviour
                     img.SetPixels(backCam.GetPixels());
                     img.Apply();
 
-
                     var send = StartCoroutine(ImgSendCoroutine());
                     var receive = StartCoroutine(BbxCoroutine());
                     yield return send;
                     yield return receive;
                     //Debug.Log($"INFO: Sent");
-
-
                     yield return null;
                 }
             }
@@ -255,20 +255,15 @@ public class QRScanner : MonoBehaviour
         TextureFormat format = img.format;
         Debug.Log("Texture Format: " + format.ToString());
 
-
         //Debug.Log("INFO: Sent IMG w/ " + imgHeaderBytes.Length);
         //imgClient.Send(imgHeaderBytes);
-
 
         Debug.Log("INFO: Sent IMG w/ " + BitConverter.GetBytes(imgBytes.Length).Length);
         imgClient.Send(BitConverter.GetBytes(imgBytes.Length));
         imgClient.Send(imgBytes);
         Debug.Log("send完");
 
-
         yield return null;
-
-
     }
 
 
@@ -277,19 +272,19 @@ public class QRScanner : MonoBehaviour
         Debug.Log($"INFO: BBX Coroutine");
         isBbxCoroutine = true;
 
+        ReceiveBbx();
+        yield return null;
+    }
 
+    private IEnumerator BbxConnectCoroutine()
+    {
         bbxClient = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         Debug.Log($"Connecting to BBX Server at {bboxClientIP} {bboxClientPort}...");
         bbxClient.Connect(new IPEndPoint(IPAddress.Parse(bboxClientIP), bboxClientPort));
         while (!bbxClient.Connected) // 非阻塞检查是否连接成功
             yield break;
-
-
         Debug.Log("INFO: Connected to BBX Server!");
-        ReceiveBbx();
-        yield return null;
     }
-
 
     void ReceiveBbx()
     {
@@ -473,8 +468,16 @@ public class QRScanner : MonoBehaviour
 
 
                 colorrr = "中間顏色 R: " + centerColor.r + ", G: " + centerColor.g + ", B: " + centerColor.b;
-                //Debug.Log("中間顏色 R: " + centerColor.r + ", G: " + centerColor.g + ", B: " + centerColor.b);
+                Debug.Log("中間顏色 R: " + centerColor.r + ", G: " + centerColor.g + ", B: " + centerColor.b);
+                if (centerColor.r + 10 < centerColor.g && centerColor.g > centerColor.b + 10)
+                {
+                    expFin = true;
+                }
+                else
+                {
+                    expFin = false;
 
+                }
 
                 string rgbString = $"rgb({centerColor.r},{centerColor.g},{centerColor.b})";
                 StartCoroutine(GetColorInfoFromAPI(rgbString));
@@ -563,9 +566,6 @@ public class QRScanner : MonoBehaviour
             Rect boxRect = new Rect(x, y, w, h);
             GUI.Box(boxRect, "Box " + i);
 
-
-
-
             // 可以在這裡進行其他繪製操作...
 
 
@@ -599,7 +599,7 @@ public class QRScanner : MonoBehaviour
             IBarcodeReader barcodeReader = new BarcodeReader();
             // decode the current frame
             var result = barcodeReader.Decode(backCam.GetPixels32(),
-              backCam.width, backCam.height);
+                backCam.width, backCam.height);
             if (result != null)
             {
                 //UnityEngine.Debug.Log(result);
@@ -713,6 +713,13 @@ public class QRScanner : MonoBehaviour
         string text = type + " " + level + "\n";
         Rect textRect = new Rect(Screen.width / 2 - 300 / 2 + 100, Screen.height / 2 - 300 / 2, Screen.width, Screen.height);
         Rect color_textRect = new Rect(Screen.width / 2 - 400 / 2 + 100, Screen.height / 2 - 300 / 2, 200, 30);
+        Rect exfinishRect = new Rect(Screen.width / 2 - 400 / 2 + 100, Screen.height / 2 - 250 / 2, 200, 20);
+
+        if (expFin == true)
+        {
+            GUI.Label(exfinishRect, expFText, style);
+        }
+
         GUI.Label(color_textRect, colorName, color_style);
         GUILayout.Label(text, style);
 
