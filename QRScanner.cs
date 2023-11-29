@@ -62,7 +62,7 @@ public class QRScanner : MonoBehaviour
     private bool isImgCoroutine = false;
     private bool isBbxCoroutine = false;
     private bool imgConnected = false;
-
+    private bool bbxConnected = false;
 
     //Header & Data
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -95,10 +95,18 @@ public class QRScanner : MonoBehaviour
     private Texture2D img;
 
 
-    //Boxes
-    private int numberOfBoxes = 6;
+    //bboxes here
+    private int numberOfBoxes = 2;
     private float[] bbxBuffer = new float[36];
-
+    public struct BBox
+    {
+        public string cls;
+        public float x;
+        public float y;
+        public float w;
+        public float h;
+    }
+    private List<BBox> bboxes = new List<BBox>();
 
     // Use this for initialization
     private void Start()
@@ -125,8 +133,6 @@ public class QRScanner : MonoBehaviour
 
 
             StartCoroutine(colorEveryFiveSeconds());
-
-
         }
         int width = backCam.width;
         int height = backCam.height;
@@ -152,55 +158,15 @@ public class QRScanner : MonoBehaviour
 
 
         img = new Texture2D(width, height);
-        ////測試始
-        //Color32[] pixels = new Color32[backCam.width * backCam.height];
-
-
-
-        ////Color32[] ReverseArray(Color32[] array)
-        ////{
-        ////    int length = array.Length;
-        ////    Color32[] reversedArray = new Color32[length];
-
-        ////    for (int i = 0; i < length; i++)
-        ////    {
-        ////        reversedArray[i] = array[length - 1 - i];
-        ////    }
-
-        ////    return reversedArray;
-        ////}
-        ////pixels = ReverseArray(pixels);// 在接收端進行像素行順序的反轉
-        ////Texture2D receivedImg = new Texture2D(width, height);// 創建新的 Texture2D 並將反轉後的像素設定進去
-        ////receivedImg.SetPixels32(pixels);
-        ////receivedImg.Apply();
-
-        //backCam.GetPixels32(pixels);
-
-        //img.SetPixels32(pixels);
-        //img.Apply();
-
-
-        Debug.Log($"Texture width: {img.width}, height: {img.height}");
-
-
-        //byte[] imageData = img.GetRawTextureData();
-        //Debug.Log($"Image data length: {imageData.Length}");
-        //
-        //測試end
-
-
     }
 
 
     public void SetImageServer()
     {
-
-
         imgServer = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         Debug.Log($"INFO: Setup IMAGE Server at {imageServerIP} on {imageServerPort}");
         imgServer.Bind(new IPEndPoint(IPAddress.Parse(imageServerIP), imageServerPort));
         Debug.Log("INFO: Setup IMAGE Server");
-
 
         imgServer.Listen(5);
         Debug.Log("INFO: Waiting for Connection...");
@@ -219,8 +185,6 @@ public class QRScanner : MonoBehaviour
 
 
             yield return StartCoroutine(ImgConnectCoroutine());
-            yield return StartCoroutine(BbxConnectCoroutine());
-
 
             if (imgConnected && imgClient != null)
             {
@@ -234,7 +198,7 @@ public class QRScanner : MonoBehaviour
                     var receive = StartCoroutine(BbxCoroutine());
                     yield return send;
                     yield return receive;
-                    //Debug.Log($"INFO: Sent");
+
                     yield return null;
                 }
             }
@@ -244,168 +208,6 @@ public class QRScanner : MonoBehaviour
             }
         }
     }
-
-
-    private IEnumerator ImgSendCoroutine()
-    {
-        Debug.Log("INFO: Connected. Ready to send!");
-
-        //imgBytes = img.GetRawTextureData();
-        imgBytes = img.EncodeToPNG();
-        TextureFormat format = img.format;
-        Debug.Log("Texture Format: " + format.ToString());
-
-        //Debug.Log("INFO: Sent IMG w/ " + imgHeaderBytes.Length);
-        //imgClient.Send(imgHeaderBytes);
-
-        Debug.Log("INFO: Sent IMG w/ " + BitConverter.GetBytes(imgBytes.Length).Length);
-        imgClient.Send(BitConverter.GetBytes(imgBytes.Length));
-        imgClient.Send(imgBytes);
-        Debug.Log("send完");
-
-        yield return null;
-    }
-
-
-    private IEnumerator BbxCoroutine()
-    {
-        Debug.Log($"INFO: BBX Coroutine");
-        isBbxCoroutine = true;
-
-        ReceiveBbx();
-        yield return null;
-    }
-
-    private IEnumerator BbxConnectCoroutine()
-    {
-        bbxClient = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        Debug.Log($"Connecting to BBX Server at {bboxClientIP} {bboxClientPort}...");
-        bbxClient.Connect(new IPEndPoint(IPAddress.Parse(bboxClientIP), bboxClientPort));
-        while (!bbxClient.Connected) // 非阻塞检查是否连接成功
-            yield break;
-        Debug.Log("INFO: Connected to BBX Server!");
-    }
-
-    void ReceiveBbx()
-    {
-        Debug.Log($"INFO: Receive data from {bbxClient}");
-
-
-        if (bbxClient != null)
-        {
-            Debug.Log("Receiving Data");
-            //byte[] headerBytes = new byte[bbxHeaderSize]; // assuming the header is 4 bytes
-            //bbxStream.Read(headerBytes, 0, headerBytes.Length);
-
-
-            //byte[] dataBytes = new byte[bbxHeaderSize];
-            //bbxStream.Read(dataBytes, 0, dataBytes.Length);
-            //Debug.Log($"Received data: {BitConverter.ToString(dataBytes)}");
-
-
-            //bbxBuffer = new float[bbxHeaderSize / sizeof(float)];
-            //Buffer.BlockCopy(dataBytes, 0, bbxBuffer, 0, dataBytes.Length);
-            ////DisplayBoundingBoxes(dataBuffer);
-
-
-            //int bytesRead = 0;
-            byte[] headerBytes = new byte[bbxHeaderSize];
-
-
-            bbxClient.Receive(headerBytes);
-
-
-            //while (bytesRead < bbxHeaderSize)
-            //{
-            //    bytesRead += bbxStream.Read(headerBytes, bytesRead, bbxHeaderSize - bytesRead);
-            //}
-
-
-            // 將 header 的 byte 數組轉換為浮點數陣列
-            for (int i = 0; i < 36; i++)
-            {
-                bbxBuffer[i] = BitConverter.ToSingle(headerBytes, i * sizeof(float));
-            }
-
-
-            //// 現在 dataBuffer 包含了你的浮點數數據，headerBytes 包含了 header 的字節數據
-            //Console.WriteLine("Header: " + BitConverter.ToString(headerBytes));
-            //Console.WriteLine("Data Buffer: " + string.Join(", ", dataBuffer));
-
-
-            //// 讀取 header 部分
-            //int bytesRead = bbxStream.Read(headerBytes, 0, bbxHeaderSize);
-
-
-            //if (bytesRead < bbxHeaderSize)
-            //{
-            //    // 處理未能讀取完整 header 的情況
-            //    Console.WriteLine("Error reading header.");
-            //    return;
-            //}
-
-
-            //// 解析 header 中的浮點數
-            //float[] headerValues = new float[36];
-
-
-            //using (MemoryStream headerStream = new MemoryStream(headerBytes))
-            //{
-            //    using (BinaryReader headerReader = new BinaryReader(headerStream))
-            //    {
-            //        for (int i = 0; i < 36; i++)
-            //        {
-            //            headerValues[i] = headerReader.ReadSingle();
-            //        }
-            //    }
-            //}
-
-
-            //// 計算 data_buffer 長度
-            //int bbxBufferSize = (int)(bbxStream.Length - bbxHeaderSize);
-
-
-            //// 讀取 data_buffer 部分
-            //byte[] dataBufferBytes = new byte[bbxBufferSize];
-            //bytesRead = bbxStream.Read(dataBufferBytes, 0, bbxBufferSize);
-
-
-            //if (bytesRead < bbxBufferSize)
-            //{
-            //    // 處理未能讀取完整 data_buffer 的情況
-            //    Console.WriteLine("Error reading data_buffer.");
-            //    return;
-            //}
-
-
-            //// 解析 data_buffer 中的浮點數
-            //bbxBuffer = new float[bbxBufferSize / sizeof(float)];
-
-
-            //using (MemoryStream dataBufferStream = new MemoryStream(dataBufferBytes))
-            //{
-            //    using (BinaryReader dataBufferReader = new BinaryReader(dataBufferStream))
-            //    {
-            //        for (int i = 0; i < bbxBufferSize / sizeof(float); i++)
-            //        {
-            //            bbxBuffer[i] = dataBufferReader.ReadSingle();
-            //        }
-            //    }
-            //}
-            PrintFloatArrayData(bbxBuffer);
-
-
-        }
-    }
-    void PrintFloatArrayData(float[] array)
-    {
-        // 使用循環遍歷 float[] 並將每個元素印出來
-        for (int i = 0; i < array.Length; i++)
-        {
-            //Debug.Log("Element " + i + ": " + array[i]);
-        }
-    }
-
 
     private IEnumerator ImgConnectCoroutine()
     {
@@ -428,7 +230,6 @@ public class QRScanner : MonoBehaviour
             }
             //Debug.Log("INFO: No Connection");
 
-
             yield return null;
         }
 
@@ -441,6 +242,85 @@ public class QRScanner : MonoBehaviour
         yield break;
     }
 
+    private IEnumerator ImgSendCoroutine()
+    {
+        Debug.Log("INFO: Connected. Ready to send!");
+
+        //imgBytes = img.GetRawTextureData();
+        imgBytes = img.EncodeToPNG();
+        //TextureFormat format = img.format;
+        //Debug.Log("Texture Format: " + format.ToString());
+
+        //Debug.Log("INFO: Sent IMG w/ " + imgHeaderBytes.Length);
+        //imgClient.Send(imgHeaderBytes);
+
+        Debug.Log("INFO: Sent IMG w/ " + BitConverter.GetBytes(imgBytes.Length).Length);
+        imgClient.Send(BitConverter.GetBytes(imgBytes.Length));
+        imgClient.Send(imgBytes);
+        Debug.Log("------------- INFO: Sent IMG! -------------");
+
+        yield return null;
+    }
+
+
+    private IEnumerator BbxCoroutine()
+    {
+        Debug.Log($"INFO: BBX Coroutine");
+        isBbxCoroutine = true;
+
+        bbxClient = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        Debug.Log($"Connecting to BBX Server at {bboxClientIP} {bboxClientPort}...");
+        bbxClient.Connect(new IPEndPoint(IPAddress.Parse(bboxClientIP), bboxClientPort));
+        while (!bbxClient.Connected) // 非阻塞检查是否连接成功
+            yield break;
+        Debug.Log("INFO: Connected to BBX Server!");
+
+        ReceiveBbx();
+        yield return null;
+    }
+
+    private IEnumerator BbxConnectCoroutine()
+    {
+        bbxClient = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        Debug.Log($"Connecting to BBX Server at {bboxClientIP} {bboxClientPort}...");
+        bbxClient.Connect(new IPEndPoint(IPAddress.Parse(bboxClientIP), bboxClientPort));
+        while (!bbxClient.Connected) // 非阻塞检查是否连接成功
+            yield break;
+        Debug.Log("INFO: Connected to BBX Server!");
+        bbxConnected = true;
+    }
+
+    void ReceiveBbx()
+    {
+        Debug.Log($"INFO: Receive data from {bbxClient}");
+
+
+        if (bbxClient != null)
+        {
+            Debug.Log("Receiving Data");
+
+            byte[] headerBytes = new byte[bbxHeaderSize];
+            Debug.Log(headerBytes.ToString());
+
+            bbxClient.Receive(headerBytes);
+            Debug.Log(headerBytes.ToString());
+
+
+
+            //while (bytesRead < bbxHeaderSize)
+            //{
+            //    bytesRead += bbxStream.Read(headerBytes, bytesRead, bbxHeaderSize - bytesRead);
+            //}
+
+
+            // 將 header 的 byte 數組轉換為浮點數陣列
+            for (int i = 0; i < 36; i++)
+            {
+                bbxBuffer[i] = BitConverter.ToSingle(headerBytes, i * sizeof(float));
+                //Debug.Log($"{bbxBuffer[i]}");
+            }
+        }
+    }
 
     private IEnumerator colorEveryFiveSeconds()
     {
@@ -545,8 +425,6 @@ public class QRScanner : MonoBehaviour
         result.SetPixels(pix);
         result.Apply();
         return result;
-
-
     }
 
 
@@ -561,19 +439,25 @@ public class QRScanner : MonoBehaviour
             int w = (int)(bbxBuffer[6 * i + 4] / 2);
             float conf = bbxBuffer[6 * i + 5];
 
+            if (cls != -1 && w != 0)
+            {
+                Debug.Log($"cls:{cls}, x:{x}, y:{y}, w:{w}, h:{h}");
+            }
 
-            //Debug.Log($"cls:{cls}, x:{x}, y:{y}, w:{w}, h:{h}");
-            Rect boxRect = new Rect(x, y, w, h);
+            
+            Rect boxRect = new Rect(x-w, y-h, w*2, h*2);
             GUI.Box(boxRect, "Box " + i);
-
-            // 可以在這裡進行其他繪製操作...
-
-
-            // 如果不希望每 frame 都更新位置，可以根據需要添加條件，例如每隔一定時間更新一次位置
+            var shaderbox = new BBox
+            {
+                cls = "beaker",
+                x = x,
+                y = y,
+                w = w,
+                h = h
+            };
+            bboxes.Add(shaderbox);
+            Debug.Log("Add box");
         }
-        //Debug.Log($"INFO: Update boxes");
-
-
     }
 
 
@@ -593,10 +477,12 @@ public class QRScanner : MonoBehaviour
 
         texture.SetPixels32(pixelData);
 
-
+        //Scanning QRcode
         try
         {
+            
             IBarcodeReader barcodeReader = new BarcodeReader();
+
             // decode the current frame
             var result = barcodeReader.Decode(backCam.GetPixels32(),
                 backCam.width, backCam.height);
@@ -639,19 +525,12 @@ public class QRScanner : MonoBehaviour
                     }
                 }
 
-
                 UnityEngine.Debug.Log("色盲型態 : " + type + " " + level);
-
-
             }
-
-
         }
         catch (Exception ex) { Debug.LogWarning(ex.Message); }
 
-
-
-
+        //Define type & set factor
         if (level == "severe")
         {
             // severe
@@ -677,7 +556,6 @@ public class QRScanner : MonoBehaviour
         background.rectTransform.localScale = new Vector3(1f, scaleY, 1f);    //非鏡像
                                                                               //background.rectTransform.localScale = new Vector3(-1f, scaleY, 1f);    //鏡像
 
-
         int orient = -backCam.videoRotationAngle;
         background.rectTransform.localEulerAngles = new Vector3(0, 0, orient);
 
@@ -696,10 +574,6 @@ public class QRScanner : MonoBehaviour
 
 
         color_style.normal.textColor = new Color(25 / 255f, 25 / 255f, 112 / 255f);
-
-
-
-
 
 
         //UnityEngine.Debug.Log("width : " + Screen.width + " " + (Screen.width / 2 - 300 / 2 + 100));
@@ -732,18 +606,15 @@ public class QRScanner : MonoBehaviour
             DrawBoxes();
         }
 
-
-
         return;
     }
-
-
 
 
     void Update()
     {
         if (factor != 1)
         {
+
             float redMultiplier = 1.0f; // 這裡設定你想要的值
             float greenMultiplier = 1.0f; // 這裡設定你想要的值
             float blueMultiplier = 1.0f; // 這裡設定你想要的值
@@ -775,10 +646,21 @@ public class QRScanner : MonoBehaviour
             colorTransformMaterial.SetFloat("_GreenMultiplier", greenMultiplier);
             colorTransformMaterial.SetFloat("_BlueMultiplier", blueMultiplier);
             factor = 1;
+
+            //int i = 0;
+            //foreach(BBox box in bboxes)
+            //{
+            //    var temp = new Vector4(box.x, box.y, box.w, box.h);
+            //    colorTransformMaterial.SetVector($"_Rect{i}", temp);
+            //    i++;
+            //}
+
+
             //break;
         }
 
     }
+
     void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
         Graphics.Blit(source, destination, colorTransformMaterial);
@@ -919,4 +801,3 @@ public class TexturePool
 
 
 }
-
