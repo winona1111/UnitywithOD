@@ -27,6 +27,8 @@ public class QRScanner : MonoBehaviour
     private string level = "";
     private string colorrr = "";
     private string colorName = "detecting...";
+    private bool expFin = false; //看實驗有沒有完成
+    private string expFText = "Experiment Finished!";
     private double factor = 1;
     private Color32 lastProcessedColor;
     public Texture2D texture;
@@ -473,8 +475,16 @@ public class QRScanner : MonoBehaviour
 
 
                 colorrr = "中間顏色 R: " + centerColor.r + ", G: " + centerColor.g + ", B: " + centerColor.b;
-                //Debug.Log("中間顏色 R: " + centerColor.r + ", G: " + centerColor.g + ", B: " + centerColor.b);
+                Debug.Log("中間顏色 R: " + centerColor.r + ", G: " + centerColor.g + ", B: " + centerColor.b);
+                if (centerColor.r + 10 < centerColor.g && centerColor.g > centerColor.b + 10)
+                {
+                    expFin = true;
+                }
+                else
+                {
+                    expFin = false;
 
+                }
 
                 string rgbString = $"rgb({centerColor.r},{centerColor.g},{centerColor.b})";
                 StartCoroutine(GetColorInfoFromAPI(rgbString));
@@ -713,6 +723,13 @@ public class QRScanner : MonoBehaviour
         string text = type + " " + level + "\n";
         Rect textRect = new Rect(Screen.width / 2 - 300 / 2 + 100, Screen.height / 2 - 300 / 2, Screen.width, Screen.height);
         Rect color_textRect = new Rect(Screen.width / 2 - 400 / 2 + 100, Screen.height / 2 - 300 / 2, 200, 30);
+        Rect exfinishRect = new Rect(Screen.width / 2 - 400 / 2 + 100, Screen.height / 2 - 250 / 2, 200, 20);
+
+        if (expFin == true)
+        {
+            GUI.Label(exfinishRect, expFText, style);
+        }
+
         GUI.Label(color_textRect, colorName, color_style);
         GUILayout.Label(text, style);
 
