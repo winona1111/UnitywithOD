@@ -1,5 +1,4 @@
-﻿
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using ZXing;
 using ZXing.QrCode;
@@ -13,16 +12,25 @@ using UnityEngine.Networking;
 using System.IO;
 using System.Runtime.InteropServices;
 
-
 public class QRScanner : MonoBehaviour
 {
+    //Camera Setting
     private bool camAvailable;
     private WebCamTexture backCam;
     private WebCamTexture frontCam;
     private Texture defaultBackground;
     private Rect screenRect;
 
+    //Image Setting
+    public Texture2D texture;
+    public RawImage background;
+    public AspectRatioFitter fit;
+    public Material colorTransformMaterial;
+    public Text colorTextMesh;
+    private TexturePool imgPool;
+    private Texture2D img;
 
+    //
     private string type = "";
     private string level = "";
     private string colorrr = "";
@@ -31,32 +39,17 @@ public class QRScanner : MonoBehaviour
     private string expFText = "Experiment Finished!";
     private double factor = 1;
     private Color32 lastProcessedColor;
-    public Texture2D texture;
-
-
-    public RawImage background;
-    public AspectRatioFitter fit;
-    public Material colorTransformMaterial;
-
-
-
-
-    public Text colorTextMesh;
-
 
     //IP & Port
-    public string imageServerIP = "192.168.68.111"; //Lab: 192.168.0.114; wifi: 10.232.202.254
-    public int imageServerPort = 5010;
-    public string bboxClientIP = "192.168.68.102"; //Lab: 192.168.0.189; wifi: 10.232.197.63
+    public string imageServerIP = "192.168.68.111"; //HoloLens IP
+    public int imageServerPort = 5010; //Self-define
+    public string bboxClientIP = "192.168.68.102"; //Remote PC IP
     public int bboxClientPort = 12345;
-
 
     //Server & Client
     private Socket imgServer;
     private Socket imgClient;
     private Socket bbxClient;
-    private NetworkStream bbxStream;
-
 
     //Boolean
     private bool isImgCoroutine = false;
@@ -64,7 +57,8 @@ public class QRScanner : MonoBehaviour
     private bool imgConnected = false;
     private bool bbxConnected = false;
 
-    //Header & Data
+    //Header & Data 
+    //TODO: 為什麼header傳不出去
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct IMAGE_HEADER
     {
@@ -82,21 +76,13 @@ public class QRScanner : MonoBehaviour
         // Padding to ensure the struct size is 32 bytes
         public byte Padding;
     }
-
-
     private byte[] imgHeaderBytes = new byte[32];
     private byte[] imgBytes;
     private string bbxHeaderFormat = "@36f";
     private int bbxHeaderSize = 36 * sizeof(float);
 
-
-    //Img Setting
-    private TexturePool imgPool;
-    private Texture2D img;
-
-
-    //bboxes here
-    private int numberOfBoxes = 2;
+    //Bbox Setting
+    private int numberOfBoxes = 2; //Define max Boxes
     private float[] bbxBuffer = new float[36];
     public struct BBox
     {
@@ -106,7 +92,7 @@ public class QRScanner : MonoBehaviour
         public float w;
         public float h;
     }
-    private List<BBox> bboxes = new List<BBox>();
+    public List<BBox> bboxes = new List<BBox>();
 
     // Use this for initialization
     private void Start()
@@ -118,10 +104,9 @@ public class QRScanner : MonoBehaviour
         colorTextMesh = GetComponent<Text>();
         backCam = new WebCamTexture();
 
-
+        //For no camera PC:)
         string camName = WebCamTexture.devices[1].name;
         backCam = new WebCamTexture(camName, Screen.width, Screen.height, 30);
-
 
         backCam.requestedHeight = Screen.height;
         backCam.requestedWidth = Screen.width;
@@ -131,14 +116,13 @@ public class QRScanner : MonoBehaviour
             background.texture = backCam;
             camAvailable = true;
 
-
             StartCoroutine(colorEveryFiveSeconds());
         }
         int width = backCam.width;
         int height = backCam.height;
         texture = new Texture2D(width, height);
         imgPool = new TexturePool();
-
+        img = new Texture2D(width, height);
 
         //Init Header
         IMAGE_HEADER header = new IMAGE_HEADER
@@ -155,12 +139,9 @@ public class QRScanner : MonoBehaviour
         };
         imgHeaderBytes = StructureToByteArray(header);
         Debug.Log("INFO:  IMG w/ " + imgHeaderBytes.Length);
-
-
-        img = new Texture2D(width, height);
     }
 
-
+    //Image Sending
     public void SetImageServer()
     {
         imgServer = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -171,7 +152,6 @@ public class QRScanner : MonoBehaviour
         imgServer.Listen(5);
         Debug.Log("INFO: Waiting for Connection...");
     }
-
 
     private IEnumerator ImageCoroutine()
     {
@@ -246,23 +226,20 @@ public class QRScanner : MonoBehaviour
     {
         Debug.Log("INFO: Connected. Ready to send!");
 
-        //imgBytes = img.GetRawTextureData();
         imgBytes = img.EncodeToPNG();
-        //TextureFormat format = img.format;
-        //Debug.Log("Texture Format: " + format.ToString());
 
+        //Send Header
         //Debug.Log("INFO: Sent IMG w/ " + imgHeaderBytes.Length);
         //imgClient.Send(imgHeaderBytes);
 
-        Debug.Log("INFO: Sent IMG w/ " + BitConverter.GetBytes(imgBytes.Length).Length);
-        imgClient.Send(BitConverter.GetBytes(imgBytes.Length));
-        imgClient.Send(imgBytes);
+        imgClient.Send(BitConverter.GetBytes(imgBytes.Length)); //Send img size to client (充當header)
+        imgClient.Send(imgBytes); //Send img data
         Debug.Log("------------- INFO: Sent IMG! -------------");
 
         yield return null;
     }
 
-
+    //Bbox Receiving
     private IEnumerator BbxCoroutine()
     {
         Debug.Log($"INFO: BBX Coroutine");
@@ -322,6 +299,7 @@ public class QRScanner : MonoBehaviour
         }
     }
 
+    //Get Color
     private IEnumerator colorEveryFiveSeconds()
     {
         while (true) // 無限循環
@@ -370,7 +348,6 @@ public class QRScanner : MonoBehaviour
             }
         }
     }
-
 
     private IEnumerator GetColorInfoFromAPI(string rgbString)
     {
@@ -427,16 +404,15 @@ public class QRScanner : MonoBehaviour
         return result;
     }
 
-
     void DrawBoxes()
     {
         for (int i = 0; i < numberOfBoxes; i++)
         {
             int temp_cls = (int)bbxBuffer[6 * i + 0];
-            float temp_x = (int)bbxBuffer[6 * i + 1];
-            float temp_y = (int)bbxBuffer[6 * i + 2];
-            float temp_h = (int)(bbxBuffer[6 * i + 3] / 2);
-            float temp_w = (int)(bbxBuffer[6 * i + 4] / 2);
+            float temp_x = bbxBuffer[6 * i + 1];
+            float temp_y = bbxBuffer[6 * i + 2];
+            float temp_h = (bbxBuffer[6 * i + 3] / 2);
+            float temp_w = (bbxBuffer[6 * i + 4] / 2);
             float temp_conf = bbxBuffer[6 * i + 5];
 
             if (temp_cls != -1 && temp_w != 0)
@@ -447,7 +423,6 @@ public class QRScanner : MonoBehaviour
             colorTransformMaterial.SetVector($"_Rect{i+1}", new Vector4(temp_x - temp_w, temp_y - temp_h, temp_x + temp_w, temp_y + temp_h));
         }
     }
-
 
     // Update is called once per frame
     private void OnGUI()
@@ -594,12 +569,10 @@ public class QRScanner : MonoBehaviour
         return;
     }
 
-
     void Update()
     {
         if (factor != 1)
         {
-
             float redMultiplier = 1.0f; // 這裡設定你想要的值
             float greenMultiplier = 1.0f; // 這裡設定你想要的值
             float blueMultiplier = 1.0f; // 這裡設定你想要的值
@@ -608,10 +581,8 @@ public class QRScanner : MonoBehaviour
                 colorTransformMaterial = new Material(Shader.Find("Custom/NewSurfaceShader"));
             }
 
-
             if (type == "protanomalous")
             {
-
                 redMultiplier = (float)factor;
                 blueMultiplier = (float)factor;
             }
@@ -631,7 +602,6 @@ public class QRScanner : MonoBehaviour
             colorTransformMaterial.SetFloat("_BlueMultiplier", blueMultiplier);
             factor = 1;
         }
-
     }
 
     void OnRenderImage(RenderTexture source, RenderTexture destination)
@@ -741,11 +711,6 @@ public class ColorName
 {
     public string value;
 }
-
-
-
-
-
 
 public class TexturePool
 {

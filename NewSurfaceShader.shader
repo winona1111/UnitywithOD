@@ -54,20 +54,11 @@ Shader "Custom/NewSurfaceShader"
             half4 frag(v2f i) : COLOR
             {    
                 half4 color = tex2D(_MainTex, i.texcoord);
-                //col.rgb *= _Factor; // Color transformation here
 
-                //if ((i.texcoord.x * 640) > 407-65 && (i.texcoord.x * 640) < 407+65 &&
-                //    (i.texcoord.y * 480) > 103-101 && (i.texcoord.y * 480) < 103+101)
-                //{
-                //    // 在 Rect1 區域內，進行顏色變換
-                //    color.r *= _RedMultiplier;
-                //    color.g *= _GreenMultiplier;
-                //    color.b *= _BlueMultiplier;
-                //}
+                //texcoord.x 介於0~1之間，需*螢幕長寬
                 if ((i.texcoord.x * 640) > _Rect1.x && (i.texcoord.x * 640) < _Rect1.z &&
                     (i.texcoord.y * 480) > _Rect1.y && (i.texcoord.y * 480) < _Rect1.w)
                 {
-                    // 在 Rect1 區域內，進行顏色變換
                     color.r *= _RedMultiplier;
                     color.g *= _GreenMultiplier;
                     color.b *= _BlueMultiplier;
@@ -76,28 +67,10 @@ Shader "Custom/NewSurfaceShader"
                 if ((i.texcoord.x * 640) > _Rect2.x && (i.texcoord.x * 640) < _Rect2.z &&
                     (i.texcoord.y * 480) > _Rect2.y && (i.texcoord.y * 480) < _Rect2.w)
                 {
-                    // 在 Rect2 區域內，進行顏色變換
                     color.r *= _RedMultiplier;
                     color.g *= _GreenMultiplier;
                     color.b *= _BlueMultiplier;
                 }
-
-                /*f (i.texcoord.x > _Rect1.x && i.texcoord.x < _Rect1.z && i.texcoord.y > _Rect1.y && i.texcoord.y < _Rect1.w)
-                {
-                    color.r *= _RedMultiplier;
-                    color.g *= _GreenMultiplier;
-                    color.b *= _BlueMultiplier;
-                }
-                if (i.texcoord.x > _Rect2.x && i.texcoord.x < _Rect2.z && i.texcoord.y > _Rect2.y && i.texcoord.y < _Rect2.w)
-                {
-                    color.r *= _RedMultiplier;
-                    color.g *= _GreenMultiplier;
-                    color.b *= _BlueMultiplier;
-                }*/
-
-                /*color.r *= _RedMultiplier;
-                color.g *= _GreenMultiplier;
-                color.b *= _BlueMultiplier;*/
                 return color;
             }
             ENDCG
